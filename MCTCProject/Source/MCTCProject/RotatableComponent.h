@@ -9,6 +9,13 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FActorRotationUpdateDelegate, float, RotationValue);
 
+UENUM()
+enum class ECircleConditions : uint8
+{
+	CC_NoCondition		UMETA(DisplayName ="Clockwise And Not Clockwise Rotation"),
+	CC_Clockwise		UMETA(DisplayName="Clockwise Rotation Only"),
+	CC_NotClockwise		UMETA(DisplayName = "No Clockwise Rotation")
+};
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class MCTCPROJECT_API URotatableComponent : public UActorComponent
@@ -27,26 +34,29 @@ public:
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dependencies")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Variable")
 	float RotationSmoothingValue;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dependencies")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Variable")
 	float TrackingTime;
-	
-	UFUNCTION(BlueprintCallable, Category = "Callable Functions")
-	void OnInputStart();
 
-	UFUNCTION(BlueprintCallable, Category = "Callable Functions")
-	void OnInputEnd();
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Variable")
+	ECircleConditions CircleConditionEnum;
+	
+	UFUNCTION(BlueprintCallable, Category = "Input Hook")
+	void StartTracking();
+
+	UFUNCTION(BlueprintCallable, Category = "Input Hook")
+	void EndTracking();
 
 	UPROPERTY(BlueprintAssignable, BlueprintCallable, Category = "Events")
 	FActorRotationUpdateDelegate UpdateActorRotation;
 
 	void TrackMousePosition();
-	void CheckMouseCirculation();
+	void CalculateRotationFromMousePositions();
 
 	float RotationSpeed;
-	bool bIsRotationEnabled;
+	bool bIsTrackingEnabled;
 
 	FVector2D MousePosition;
 	TArray<FVector2D> SaveMousePosition;

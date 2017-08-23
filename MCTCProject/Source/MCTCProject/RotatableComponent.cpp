@@ -6,13 +6,12 @@
 // Sets default values for this component's properties
 URotatableComponent::URotatableComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
 
-	TrackingTime = 0.2f; //measured 0.2 is good time for rotation measuring
-	RotationSmoothingValue = 0.0015f;
-	bIsRotationEnabled = false;
+	TrackingTime = 0.2f; //measured 0.2 is good time for tracking mouse coordinates
+	RotationSmoothingValue = 0.0015f; //measured multiplying RotationSpeed with 0.0015 results in a smooth object rotation
+	bIsTrackingEnabled = false;
+	CircleConditionEnum = ECircleConditions::CC_NoCondition;
 }
 
 
@@ -28,35 +27,35 @@ void URotatableComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (bIsRotationEnabled) 
+	if (bIsTrackingEnabled) 
 	{
 		TrackMousePosition();
 		UpdateActorRotation.Broadcast(RotationSpeed);
 	}
 }
 
-void URotatableComponent::OnInputStart()
+// Called from Outside
+void URotatableComponent::StartTracking()
 {
-	//UE_LOG(LogTemp, Warning, TEXT("rotatable component: received input"));
-	bIsRotationEnabled = true;
-	CheckMouseCirculation();
+	bIsTrackingEnabled = true;
+	CalculateRotationFromMousePositions();
 }
 
-void URotatableComponent::OnInputEnd()
+// Called from Outside
+void URotatableComponent::EndTracking()
 {
-	bIsRotationEnabled = false;
+	bIsTrackingEnabled = false;
 }
 
 void URotatableComponent::TrackMousePosition()
 {
 	GetWorld()->GetFirstPlayerController()->GetMousePosition(MousePosition.X, MousePosition.Y);
-	//UE_LOG(LogTemp, Warning, TEXT("X: %f, Y: %f"), MousePosition.X, MousePosition.Y);
 	SaveMousePosition.Add(MousePosition);
 }
 
-void URotatableComponent::CheckMouseCirculation()
+// Calling itself after a period of time as long as tracking is enabled
+void URotatableComponent::CalculateRotationFromMousePositions()
 {
-	//UE_LOG(LogTemp, Warning, TEXT("rotatable component: calculating mouse circulation"));
 	if (SaveMousePosition.Num() > 2)
 	{
 		FVector2D FirstVector = SaveMousePosition[0];
@@ -72,27 +71,36 @@ void URotatableComponent::CheckMouseCirculation()
 		FirstSecondCathetus.Normalize();
 		SecondThirdCathetus.Normalize();
 
-		float crossProduct = FVector2D::CrossProduct(FirstSecondCathetus, SecondThirdCathetus);
-
+		float CrossProduct = FVector2D::CrossProduct(FirstSecondCathetus, SecondThirdCathetus);
 		float Distance = FirstThirdHypotenuse.Size();
-		UE_LOG(LogTemp, Warning, TEXT("%f"), Distance);
 
-		if (crossProduct < 0) //clockwise rotation
+		if (CrossProduct < 0) //clockwise rotation
 		{
-			
-			RotationSpeed = (Distance)*RotationSmoothingValue;
+			if (CircleConditionEnum == ECircleConditions::CC_NoCondition || CircleConditionEnum == ECircleConditions::CC_Clockwise)
+			{
+				RotationSpeed = (Distance)*RotationSmoothingValue;
+			}
+			else
+			{
+				RotationSpeed = 0.f;
+			}
 		}
 		else //no clockwise rotation
 		{
-			RotationSpeed = -(Distance)*RotationSmoothingValue;
+			if (CircleConditionEnum == ECircleConditions::CC_NoCondition || CircleConditionEnum == ECircleConditions::CC_NotClockwise)
+			{
+				RotationSpeed = -(Distance)*RotationSmoothingValue;
+			}
+			else
+			{
+				RotationSpeed = 0.f;
+			}
 		}
-
-		//UE_LOG(LogTemp, Warning, TEXT("%f"), crossProduct);
 	}
 
-	if (bIsRotationEnabled)
+	if (bIsTrackingEnabled)
 	{
-		GetWorld()->GetTimerManager().SetTimer(PositionLoggerTimerHandle, this, &URotatableComponent::CheckMouseCirculation, TrackingTime, false);
+		GetWorld()->GetTimerManager().SetTimer(PositionLoggerTimerHandle, this, &URotatableComponent::CalculateRotationFromMousePositions, TrackingTime, false);
 	}
 	else
 	{
